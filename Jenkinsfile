@@ -172,4 +172,4 @@ pipeline {
             }
         }
     }
-}
+} // <-- This closes the 'pipeline' block correctly
