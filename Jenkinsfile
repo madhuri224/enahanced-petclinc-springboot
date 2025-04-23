@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     tools {
-        maven 'maven' // Ensure the Maven installation name matches the one configured in Jenkins
+        maven 'maven'
     }
 
     environment {
         IMAGE_NAME        = "springbootapp"
-        IMAGE_TAG         = "${BUILD_NUMBER}" // Use build number as version
+        IMAGE_TAG         = "${BUILD_NUMBER}"
         ACR_NAME          = "jenkinsazure"
         ACR_LOGIN_SERVER  = "${ACR_NAME}.azurecr.io"
         FULL_IMAGE_NAME   = "${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${IMAGE_TAG}"
@@ -40,42 +40,40 @@ pipeline {
         }
 
         stage('File System Scan By Trivy') {
-    steps {
-        echo "Trivy Scan Started"
-        sh '''
-            # Install Trivy temporarily for this pipeline run
-            sudo apt-get update
-            sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-            echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-            sudo apt-get update
-            sudo apt-get install -y trivy
+            steps {
+                echo "Trivy Scan Started"
+                sh '''
+                    sudo apt-get update || true
+                    sudo apt-get install -y wget apt-transport-https gnupg lsb-release || true
+                    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+                    echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+                    sudo apt-get update || true
+                    sudo apt-get install -y trivy || true
+                    trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .
+                '''
+            }
+        }
 
-            # Run the Trivy scan
-            trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .
-        '''
-    }
-}
-       
         stage('Sonar Analysis') {
             environment {
                 SCANNER_HOME = tool 'Sonar-scanner'
             }
             steps {
                 withSonarQubeEnv('sonarserver') {
-    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
-        sh '''
-            $SCANNER_HOME/bin/sonar-scanner \
-            -Dsonar.organization=madhuri224 \
-            -Dsonar.projectKey=madhuri224_Springboot \
-            -Dsonar.projectName=Springboot \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.login=$SONAR_TOKEN \
-            -Dsonar.java.binaries=target/classes \
-            -Dsonar.exclusions=**/trivy-fs-output.txt
-        '''
-    }
-}
+                    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+                        sh '''
+                            $SCANNER_HOME/bin/sonar-scanner \
+                            -Dsonar.organization=madhuri224 \
+                            -Dsonar.projectKey=madhuri224_Springboot \
+                            -Dsonar.projectName=Springboot \
+                            -Dsonar.host.url=https://sonarcloud.io \
+                            -Dsonar.login=$SONAR_TOKEN \
+                            -Dsonar.java.binaries=target/classes \
+                            -Dsonar.exclusions=**/trivy-fs-output.txt
+                        '''
+                    }
+                }
+            }
         }
 
         stage('Sonar Quality Gate') {
@@ -85,14 +83,14 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Maven Package') {
             steps {
                 echo "Maven Package Started"
                 sh 'mvn package'
             }
         }
-        
+
         stage('Docker Build') {
             steps {
                 script {
@@ -155,21 +153,21 @@ pipeline {
                     def deploymentExists = output != ""
 
                     if (deploymentExists) {
-                        echo "Deployment exists. Performing rolling update with new image: ${BUILD_NUMBER}"
+                        echo "Deployment exists. Performing rolling update."
                         sh """
                             kubectl set image deployment/${K8S_DEPLOYMENT} \
-                            ${K8S_DEPLOYMENT}=${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${BUILD_NUMBER} \
+                            ${K8S_DEPLOYMENT}=${FULL_IMAGE_NAME} \
                             -n $K8S_NAMESPACE
                         """
                     } else {
-                        echo "Deployment not found. Creating new deployment from template"
+                        echo "Deployment not found. Creating new deployment."
                         sh """
                             sed "s/__IMAGE_TAG__/${BUILD_NUMBER}/" k8s/sprinboot-deployment.yaml > k8s/tmp-deployment.yaml
-                             kubectl apply -f k8s/tmp-deployment.yaml -n $K8S_NAMESPACE
-                       """
+                            kubectl apply -f k8s/tmp-deployment.yaml -n $K8S_NAMESPACE
+                        """
                     }
                 }
             }
         }
     }
-} 
+}
