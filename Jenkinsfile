@@ -21,7 +21,7 @@ pipeline {
     stages {
         stage('Checkout From Git') {
             steps {
-                git branch: 'prod', url: 'https://github.com/bkrrajmali/enahanced-petclinc-springboot.git'
+                git branch: 'prod', url: 'https://github.com/madhuri224/enahanced-petclinc-springboot.git'
             }
         }
 
@@ -40,28 +40,42 @@ pipeline {
         }
 
         stage('File System Scan By Trivy') {
-            steps {
-                echo "Trivy Scan Started"
-                sh 'trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .'
-            }
-        }
+    steps {
+        echo "Trivy Scan Started"
+        sh '''
+            # Install Trivy temporarily for this pipeline run
+            sudo apt-get update
+            sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+            echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+            sudo apt-get update
+            sudo apt-get install -y trivy
 
+            # Run the Trivy scan
+            trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .
+        '''
+    }
+}
+       
         stage('Sonar Analysis') {
             environment {
                 SCANNER_HOME = tool 'Sonar-scanner'
             }
             steps {
                 withSonarQubeEnv('sonarserver') {
-                    sh '''
-                        $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.organization=bkrrajmali \
-                        -Dsonar.projectName=SpringBootPet \
-                        -Dsonar.projectKey=bkrrajmali_springbootpet \
-                        -Dsonar.java.binaries=. \
-                        -Dsonar.exclusions=**/trivy-fs-output.txt
-                    '''
-                }
-            }
+    withCredentials([string(credentialsId: 'SONAR_TOKEN', variable: 'SONAR_TOKEN')]) {
+        sh '''
+            $SCANNER_HOME/bin/sonar-scanner \
+            -Dsonar.organization=madhuri224 \
+            -Dsonar.projectKey=madhuri224_Springboot \
+            -Dsonar.projectName=Springboot \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.login=$SONAR_TOKEN \
+            -Dsonar.java.binaries=target/classes \
+            -Dsonar.exclusions=**/trivy-fs-output.txt
+        '''
+    }
+}
         }
 
         stage('Sonar Quality Gate') {
@@ -71,14 +85,14 @@ pipeline {
                 }
             }
         }
-
+        
         stage('Maven Package') {
             steps {
                 echo "Maven Package Started"
                 sh 'mvn package'
             }
         }
-
+        
         stage('Docker Build') {
             steps {
                 script {
@@ -157,5 +171,5 @@ pipeline {
                 }
             }
         }
-    }
+    }   
 }
