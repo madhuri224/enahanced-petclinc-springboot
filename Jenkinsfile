@@ -166,10 +166,10 @@ pipeline {
                         sh """
                             sed "s/__IMAGE_TAG__/${BUILD_NUMBER}/" k8s/sprinboot-deployment.yaml > k8s/tmp-deployment.yaml
                              kubectl apply -f k8s/tmp-deployment.yaml -n $K8S_NAMESPACE
-                        """
+                       """
                     }
                 }
             }
         }
-    }   
+    }
 }
