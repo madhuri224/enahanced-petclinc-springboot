@@ -40,20 +40,19 @@ pipeline {
         }
 
         stage('File System Scan By Trivy') {
-            steps {
-                echo "Trivy Scan Started"
-                sh '''
-                    sudo apt-get update || true
-                    sudo apt-get install -y wget apt-transport-https gnupg lsb-release || true
-                    wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
-                    echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-                    sudo apt-get update || true
-                    sudo apt-get install -y trivy || true
-                    trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .
-                '''
-            }
-        }
-
+    steps {
+        echo "Trivy Scan Started"
+        sh '''
+            sudo apt-get update || true
+            sudo apt-get install -y wget apt-transport-https gnupg lsb-release || true
+            wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+            echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+            sudo apt-get update || true
+            sudo apt-get install -y trivy || true
+            trivy fs --format table --output trivy-report.txt --severity HIGH,CRITICAL .
+        '''
+    }
+}
         stage('Sonar Analysis') {
             environment {
                 SCANNER_HOME = tool 'Sonar-scanner'
