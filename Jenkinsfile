@@ -85,14 +85,16 @@ pipeline {
         }
 
         stage('Docker Build') {
-            steps {
-                script {
-                    echo "Docker Build Started"
-                    docker.build("${IMAGE_NAME}:${IMAGE_TAG}")
-                }
-            }
+    steps {
+        script {
+            echo "Docker Build Started"
+            sh '''
+                echo "Docker version: $(docker --version)"
+                docker build -t springbootapp:${BUILD_NUMBER} .
+            '''
         }
-
+    }
+}
         stage('Azure Login to ACR') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'azure-acr-sp', usernameVariable: 'AZURE_USERNAME', passwordVariable: 'AZURE_PASSWORD')]) {
